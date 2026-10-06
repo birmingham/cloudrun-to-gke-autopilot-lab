@@ -1,0 +1,27 @@
+# Terraform: never commit state, plans, or local provider caches
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Variable files can hold project IDs or secrets; commit an example instead
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# Credentials
+*.json.key
+*-key.json
+.env
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
