@@ -2,6 +2,26 @@
 
 Hands-on lab that deploys a small Node.js service to Cloud Run, then moves it onto a private GKE Autopilot cluster built with Terraform and packaged with Helm. It covers VPC-native networking, least-privilege service accounts, Workload Identity, health probes, graceful shutdown, autoscaling, and common failure modes.
 
+## Table of contents
+
+- [Architecture](#architecture)
+- [Repository layout](#repository-layout)
+- [Prerequisites](#prerequisites)
+  - [Installing the tools on macOS (Homebrew)](#installing-the-tools-on-macos-homebrew)
+  - [Installing the tools on Windows](#installing-the-tools-on-windows)
+- [Configuration](#configuration)
+- [Quick start](#quick-start)
+  - [1. Set up the project and deploy the Cloud Run baseline](#1-set-up-the-project-and-deploy-the-cloud-run-baseline)
+  - [2. Provision the platform with Terraform](#2-provision-the-platform-with-terraform)
+  - [3. Connect kubectl](#3-connect-kubectl)
+  - [4. Deploy with Helm](#4-deploy-with-helm)
+  - [5. Verify](#5-verify)
+- [Cloud Run to GKE mapping](#cloud-run-to-gke-mapping)
+- [Design notes](#design-notes)
+- [Troubleshooting drills](#troubleshooting-drills)
+- [Teardown](#teardown)
+- [Cost](#cost)
+
 ## Architecture
 
 ```
