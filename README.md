@@ -164,6 +164,10 @@ source scripts/env.sh
 
 Override any default by exporting it before sourcing, for example `export REGION=us-central1`.
 
+`env.sh` also exports `PROJECT_ID`, `REGION`, `CLUSTER_NAME`, `NAMESPACE`, `APP_NAME`, and `REPO_NAME` to Terraform as `TF_VAR_*` variables, so names are defined in one place and the scripts, Helm, and Terraform can't drift apart. Source `env.sh` in every new terminal before running Terraform; there's no need to pass `-var` flags.
+
+Changing `CLUSTER_NAME`, `APP_NAME`, or `REPO_NAME` after the infrastructure exists renames real resources, which Terraform does by destroying and recreating them. Always review `terraform plan` before applying a rename.
+
 ## Quick start
 
 ### 1. Set up the project and deploy the Cloud Run baseline
@@ -191,8 +195,8 @@ Terraform state is stored remotely in the GCS bucket that `setup.sh` created. Th
 ```bash
 cd terraform
 terraform init -backend-config="bucket=$TF_STATE_BUCKET"
-terraform plan  -var project_id=$PROJECT_ID
-terraform apply -var project_id=$PROJECT_ID
+terraform plan    # variables come from TF_VAR_* exported by env.sh
+terraform apply
 cd ..
 ```
 
@@ -218,6 +222,7 @@ helm lint charts/hello-api
 helm upgrade --install $APP_NAME charts/hello-api -n $NAMESPACE \
   --set image.repository=$IMAGE \
   --set image.tag=$IMAGE_TAG \
+  --set serviceAccount.name=$APP_NAME \
   --set serviceAccount.gcpServiceAccount=$APP_NAME@$PROJECT_ID.iam.gserviceaccount.com
 
 # Production values: add  -f charts/hello-api/values-prod.yaml  to the command above

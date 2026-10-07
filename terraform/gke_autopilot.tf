@@ -1,6 +1,6 @@
 # Private GKE Autopilot cluster
 resource "google_container_cluster" "lab" {
-  name             = "gke-lab"
+  name             = var.cluster_name
   location         = var.region
   enable_autopilot = true
 

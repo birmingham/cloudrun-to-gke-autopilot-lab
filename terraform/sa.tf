@@ -14,16 +14,16 @@ resource "google_project_iam_member" "nodes" {
   member  = "serviceAccount:${google_service_account.nodes.email}"
 }
 
-# Workload Identity: Kubernetes SA hello/hello-api acts as this Google SA
+# Workload Identity: Kubernetes SA <namespace>/<app_name> acts as this Google SA
 resource "google_service_account" "app" {
-  account_id   = "hello-api"
-  display_name = "hello-api workload identity"
+  account_id   = var.app_name
+  display_name = "${var.app_name} workload identity"
 }
 
 resource "google_service_account_iam_member" "app_wi" {
   service_account_id = google_service_account.app.name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "serviceAccount:${var.project_id}.svc.id.goog[hello/hello-api]"
+  member             = "serviceAccount:${var.project_id}.svc.id.goog[${var.namespace}/${var.app_name}]"
 
   # The workload identity pool exists only after the cluster is created.
   depends_on = [google_container_cluster.lab]

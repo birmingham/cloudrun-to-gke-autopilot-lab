@@ -19,6 +19,14 @@ export IMAGE_TAG="${IMAGE_TAG:-v1}"
 export IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${APP_NAME}"
 export TF_STATE_BUCKET="${TF_STATE_BUCKET:-${PROJECT_ID}-tfstate}"
 
+# Feed the same values to Terraform, so names are defined only here.
+export TF_VAR_project_id="${PROJECT_ID}"
+export TF_VAR_region="${REGION}"
+export TF_VAR_cluster_name="${CLUSTER_NAME}"
+export TF_VAR_namespace="${NAMESPACE}"
+export TF_VAR_app_name="${APP_NAME}"
+export TF_VAR_repo_name="${REPO_NAME}"
+
 if [[ -z "${PROJECT_ID}" ]]; then
   echo "ERROR: PROJECT_ID is not set and no default gcloud project is configured." >&2
   echo "       Run: export PROJECT_ID=<your-project> && source scripts/env.sh" >&2

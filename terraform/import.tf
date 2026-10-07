@@ -10,5 +10,5 @@
 # scripts/setup.sh before Terraform.
 import {
   to = google_artifact_registry_repository.apps
-  id = "projects/${var.project_id}/locations/${var.region}/repositories/apps"
+  id = "projects/${var.project_id}/locations/${var.region}/repositories/${var.repo_name}"
 }

@@ -33,7 +33,7 @@ else
 fi
 
 echo "==> Destroying Terraform-managed infrastructure"
-terraform -chdir="${REPO_ROOT}/terraform" destroy -var "project_id=${PROJECT_ID}" -auto-approve
+terraform -chdir="${REPO_ROOT}/terraform" destroy -auto-approve   # variables come from TF_VAR_* in env.sh
 
 echo
 echo "Teardown complete."
