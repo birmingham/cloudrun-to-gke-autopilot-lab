@@ -36,6 +36,7 @@ Hands-on lab that deploys a small Node.js service to Cloud Run, then moves it on
 │   ├── network.tf           # VPC, subnet with secondary ranges, Cloud Router, Cloud NAT
 │   ├── sa.tf                # Node service account, app service account, Workload Identity binding
 │   ├── gke_autopilot.tf     # Private GKE Autopilot cluster
+│   ├── import.tf            # Adopts the Artifact Registry repo that setup.sh creates
 │   ├── artifact_registry.tf # Docker repository
 │   └── outputs.tf           # get-credentials command, app service account email
 └── charts/hello-api/        # Helm chart
@@ -48,7 +49,7 @@ Hands-on lab that deploys a small Node.js service to Cloud Run, then moves it on
 ## Prerequisites
 
 - A GCP project with billing enabled, and Owner (or equivalent IAM admin) access to it, since `setup.sh` grants an IAM role
-- `gcloud`, `terraform` (1.5+), `kubectl`, `helm` (3.x)
+- `gcloud`, `terraform` (1.6+), `kubectl`, `helm` (3.x)
 - `gke-gcloud-auth-plugin`: `gcloud components install gke-gcloud-auth-plugin`
 - A browser for the gcloud login prompts (`setup.sh` handles authentication; see step 1)
 
@@ -185,17 +186,17 @@ It checks state before each step, so it's safe to rerun. On a remote machine wit
 
 ### 2. Provision the platform with Terraform
 
-Terraform state is stored remotely in the GCS bucket that `setup.sh` created. The bucket name is passed at init time, because backend blocks can't use variables. The repository was also created by `setup.sh`, so import it into Terraform state before the first apply:
+Terraform state is stored remotely in the GCS bucket that `setup.sh` created. The bucket name is passed at init time, because backend blocks can't use variables.
 
 ```bash
 cd terraform
 terraform init -backend-config="bucket=$TF_STATE_BUCKET"
-terraform import -var project_id=$PROJECT_ID google_artifact_registry_repository.apps \
-  projects/$PROJECT_ID/locations/$REGION/repositories/$REPO_NAME
 terraform plan  -var project_id=$PROJECT_ID
 terraform apply -var project_id=$PROJECT_ID
 cd ..
 ```
+
+`setup.sh` creates the Artifact Registry repository before Terraform runs (the image has to be pushed for the Cloud Run baseline). The `import` block in `import.tf` adopts that existing repository into Terraform state automatically, so the first `plan` shows it as an import rather than a create, with no manual `terraform import` command. Once it's in state, the block does nothing.
 
 Cluster creation takes several minutes. If GKE asks for a control-plane CIDR, add `master_ipv4_cidr_block = "172.16.0.32/28"` to `private_cluster_config` in `gke_autopilot.tf`.
 
@@ -286,7 +287,7 @@ helm history hello-api -n hello
 scripts/teardown.sh        # asks for confirmation; use --yes to skip the prompt
 ```
 
-Uninstalls the Helm release, deletes the Cloud Run service, and runs `terraform destroy`, which also removes the Artifact Registry repository and its images. Each step skips cleanly if the resource is already gone. To rebuild for the next session, run `scripts/setup.sh`, then repeat steps 2 to 4, including the import, since `setup.sh` recreates the repository before Terraform runs.
+Uninstalls the Helm release, deletes the Cloud Run service, and runs `terraform destroy`, which also removes the Artifact Registry repository and its images. Each step skips cleanly if the resource is already gone. To rebuild for the next session, run `scripts/setup.sh`, then repeat steps 2 to 4. The `import` block adopts the recreated repository again automatically.
 
 The Terraform state bucket is deliberately left in place, since it holds the state history. To remove it once you're completely done with the lab:
 
