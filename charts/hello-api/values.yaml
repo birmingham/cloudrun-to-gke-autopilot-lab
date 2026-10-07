@@ -2,6 +2,7 @@
 image:
   repository: us-west1-docker.pkg.dev/PROJECT_ID/apps/hello-api
   tag: v1
+  pullPolicy: IfNotPresent
 
 containerPort: 8080
 livenessPath: /healthz
