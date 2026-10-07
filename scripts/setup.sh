@@ -57,8 +57,51 @@ else
     --location="${REGION}"
 fi
 
+echo "==> Granting Cloud Build permissions to the build service account"
+# New projects run Cloud Build as the Compute Engine default service account,
+# which no longer gets broad permissions automatically. Without this role,
+# builds fail with "does not have storage.objects.get access".
+PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format='value(projectNumber)')"
+BUILD_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+BUILD_ROLE="roles/cloudbuild.builds.builder"
+
+# The default service account appears shortly after the Compute API is enabled.
+for attempt in 1 2 3 4 5 6; do
+  if gcloud iam service-accounts describe "${BUILD_SA}" >/dev/null 2>&1; then
+    break
+  fi
+  echo "    Waiting for ${BUILD_SA} to be created (attempt ${attempt}/6)"
+  sleep 10
+done
+
+EXISTING_BINDING="$(gcloud projects get-iam-policy "${PROJECT_ID}" \
+  --flatten='bindings[].members' \
+  --filter="bindings.role=${BUILD_ROLE} AND bindings.members=serviceAccount:${BUILD_SA}" \
+  --format='value(bindings.role)')"
+if [[ -n "${EXISTING_BINDING}" ]]; then
+  echo "    ${BUILD_SA} already has ${BUILD_ROLE}, skipping"
+else
+  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+    --member="serviceAccount:${BUILD_SA}" \
+    --role="${BUILD_ROLE}" \
+    --condition=None \
+    --quiet >/dev/null
+  echo "    Granted ${BUILD_ROLE} to ${BUILD_SA}"
+fi
+
 echo "==> Building ${IMAGE}:${IMAGE_TAG} with Cloud Build"
-gcloud builds submit "${REPO_ROOT}/${APP_NAME}/" --tag "${IMAGE}:${IMAGE_TAG}"
+# A newly granted IAM role can take a minute or two to take effect, so retry.
+for attempt in 1 2 3 4; do
+  if gcloud builds submit "${REPO_ROOT}/${APP_NAME}/" --tag "${IMAGE}:${IMAGE_TAG}"; then
+    break
+  fi
+  if [[ ${attempt} -eq 4 ]]; then
+    echo "ERROR: Cloud Build failed after ${attempt} attempts." >&2
+    exit 1
+  fi
+  echo "    Build failed (attempt ${attempt}/4); waiting 30s for IAM changes to propagate, then retrying"
+  sleep 30
+done
 
 echo "==> Deploying Cloud Run baseline"
 gcloud run deploy "${APP_NAME}" \

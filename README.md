@@ -46,7 +46,7 @@ Hands-on lab that deploys a small Node.js service to Cloud Run, then moves it on
 
 ## Prerequisites
 
-- A GCP project with billing enabled
+- A GCP project with billing enabled, and Owner (or equivalent IAM admin) access to it, since `setup.sh` grants an IAM role
 - `gcloud`, `terraform` (1.5+), `kubectl`, `helm` (3.x)
 - `gke-gcloud-auth-plugin`: `gcloud components install gke-gcloud-auth-plugin`
 - A browser for the gcloud login prompts (`setup.sh` handles authentication; see step 1)
@@ -175,7 +175,8 @@ The script:
 2. Sets the gcloud project and the ADC quota project.
 3. Enables the required APIs.
 4. Creates the Artifact Registry repository if it doesn't exist.
-5. Builds the image with Cloud Build and deploys the Cloud Run baseline (`--concurrency 80`, `--min-instances 1`, `--max-instances 10`).
+5. Grants `roles/cloudbuild.builds.builder` to the Compute Engine default service account. New projects run Cloud Build as that account, and it no longer gets broad permissions automatically, so without this role builds fail with `does not have storage.objects.get access`.
+6. Builds the image with Cloud Build, retrying for a couple of minutes while a new IAM grant takes effect, and deploys the Cloud Run baseline (`--concurrency 80`, `--min-instances 1`, `--max-instances 10`).
 
 It checks state before each step, so it's safe to rerun. On a remote machine without a browser, run `gcloud auth login --no-launch-browser` and `gcloud auth application-default login --no-launch-browser` yourself first; the script will then see you're logged in and skip those prompts.
 
