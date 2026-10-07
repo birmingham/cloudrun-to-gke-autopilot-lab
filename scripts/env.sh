@@ -17,6 +17,7 @@ export APP_NAME="${APP_NAME:-hello-api}"
 export REPO_NAME="${REPO_NAME:-apps}"
 export IMAGE_TAG="${IMAGE_TAG:-v1}"
 export IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${APP_NAME}"
+export TF_STATE_BUCKET="${TF_STATE_BUCKET:-${PROJECT_ID}-tfstate}"
 
 if [[ -z "${PROJECT_ID}" ]]; then
   echo "ERROR: PROJECT_ID is not set and no default gcloud project is configured." >&2
@@ -27,3 +28,4 @@ fi
 
 echo "PROJECT_ID=${PROJECT_ID}  REGION=${REGION}  CLUSTER=${CLUSTER_NAME}"
 echo "IMAGE=${IMAGE}:${IMAGE_TAG}"
+echo "TF_STATE_BUCKET=gs://${TF_STATE_BUCKET}"

@@ -57,6 +57,20 @@ else
     --location="${REGION}"
 fi
 
+echo "==> Ensuring Terraform state bucket gs://${TF_STATE_BUCKET} exists"
+# Terraform can't create the bucket that holds its own state, so it's created here.
+if gcloud storage buckets describe "gs://${TF_STATE_BUCKET}" >/dev/null 2>&1; then
+  echo "    Bucket already exists, skipping"
+else
+  gcloud storage buckets create "gs://${TF_STATE_BUCKET}" \
+    --location="${REGION}" \
+    --uniform-bucket-level-access \
+    --public-access-prevention
+fi
+# Versioning keeps prior state files, so a bad apply or corrupted state can be recovered.
+gcloud storage buckets update "gs://${TF_STATE_BUCKET}" --versioning >/dev/null
+echo "    Versioning enabled"
+
 echo "==> Granting Cloud Build permissions to the build service account"
 # New projects run Cloud Build as the Compute Engine default service account,
 # which no longer gets broad permissions automatically. Without this role,
@@ -117,3 +131,4 @@ echo "Done. Cloud Run URL:"
 gcloud run services describe "${APP_NAME}" --region "${REGION}" --format='value(status.url)'
 echo
 echo "Next: provision the cluster with Terraform (see README, step 2)."
+echo "      terraform -chdir=terraform init -backend-config=\"bucket=${TF_STATE_BUCKET}\""

@@ -23,13 +23,14 @@ Hands-on lab that deploys a small Node.js service to Cloud Run, then moves it on
 .
 ├── scripts/                 # Setup and teardown automation
 │   ├── env.sh               # Shared variables (source this)
-│   ├── setup.sh             # APIs, Artifact Registry, image build, Cloud Run deploy
+│   ├── setup.sh             # Auth, APIs, Artifact Registry, state bucket, build, Cloud Run deploy
 │   ├── connect.sh           # kubectl credentials and namespace
 │   └── teardown.sh          # Removes everything the lab created
 ├── hello-api/               # Sample service
 │   ├── server.js            # /healthz, /readyz, graceful SIGTERM shutdown
 │   └── Dockerfile
 ├── terraform/               # Platform infrastructure
+│   ├── backend.tf           # Remote state in GCS (bucket supplied at init)
 │   ├── provider.tf          # Terraform and Google provider configuration
 │   ├── variables.tf         # project_id, region
 │   ├── network.tf           # VPC, subnet with secondary ranges, Cloud Router, Cloud NAT
@@ -158,6 +159,7 @@ source scripts/env.sh
 | `APP_NAME` | `hello-api` | Service, image, and Helm release name |
 | `REPO_NAME` | `apps` | Artifact Registry repository |
 | `IMAGE_TAG` | `v1` | Image tag to build and deploy |
+| `TF_STATE_BUCKET` | `<PROJECT_ID>-tfstate` | GCS bucket for Terraform remote state |
 
 Override any default by exporting it before sourcing, for example `export REGION=us-central1`.
 
@@ -175,18 +177,19 @@ The script:
 2. Sets the gcloud project and the ADC quota project.
 3. Enables the required APIs.
 4. Creates the Artifact Registry repository if it doesn't exist.
-5. Grants `roles/cloudbuild.builds.builder` to the Compute Engine default service account. New projects run Cloud Build as that account, and it no longer gets broad permissions automatically, so without this role builds fail with `does not have storage.objects.get access`.
-6. Builds the image with Cloud Build, retrying for a couple of minutes while a new IAM grant takes effect, and deploys the Cloud Run baseline (`--concurrency 80`, `--min-instances 1`, `--max-instances 10`).
+5. Creates the Terraform state bucket if it doesn't exist (uniform bucket-level access, public access prevention) and enables object versioning so earlier state can be recovered.
+6. Grants `roles/cloudbuild.builds.builder` to the Compute Engine default service account. New projects run Cloud Build as that account, and it no longer gets broad permissions automatically, so without this role builds fail with `does not have storage.objects.get access`.
+7. Builds the image with Cloud Build, retrying for a couple of minutes while a new IAM grant takes effect, and deploys the Cloud Run baseline (`--concurrency 80`, `--min-instances 1`, `--max-instances 10`).
 
 It checks state before each step, so it's safe to rerun. On a remote machine without a browser, run `gcloud auth login --no-launch-browser` and `gcloud auth application-default login --no-launch-browser` yourself first; the script will then see you're logged in and skip those prompts.
 
 ### 2. Provision the platform with Terraform
 
-The repository was created by `setup.sh`, so import it into Terraform state before the first apply:
+Terraform state is stored remotely in the GCS bucket that `setup.sh` created. The bucket name is passed at init time, because backend blocks can't use variables. The repository was also created by `setup.sh`, so import it into Terraform state before the first apply:
 
 ```bash
 cd terraform
-terraform init
+terraform init -backend-config="bucket=$TF_STATE_BUCKET"
 terraform import -var project_id=$PROJECT_ID google_artifact_registry_repository.apps \
   projects/$PROJECT_ID/locations/$REGION/repositories/$REPO_NAME
 terraform plan  -var project_id=$PROJECT_ID
@@ -283,7 +286,13 @@ helm history hello-api -n hello
 scripts/teardown.sh        # asks for confirmation; use --yes to skip the prompt
 ```
 
-Uninstalls the Helm release, deletes the Cloud Run service, and runs `terraform destroy`, which also removes the Artifact Registry repository and its images. Each step skips cleanly if the resource is already gone. To rebuild for the next session, run `scripts/setup.sh`, then repeat steps 2 to 4 (the import isn't needed after a destroy, since Terraform will create the repository).
+Uninstalls the Helm release, deletes the Cloud Run service, and runs `terraform destroy`, which also removes the Artifact Registry repository and its images. Each step skips cleanly if the resource is already gone. To rebuild for the next session, run `scripts/setup.sh`, then repeat steps 2 to 4, including the import, since `setup.sh` recreates the repository before Terraform runs.
+
+The Terraform state bucket is deliberately left in place, since it holds the state history. To remove it once you're completely done with the lab:
+
+```bash
+gcloud storage rm --recursive gs://$TF_STATE_BUCKET
+```
 
 ## Cost
 
