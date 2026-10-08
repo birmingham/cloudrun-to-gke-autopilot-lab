@@ -277,6 +277,7 @@ kubectl run wi-test -n hello --rm -it --image=google/cloud-sdk:slim \
 - **VPC-native networking:** dedicated secondary ranges for pods and services.
 - **Least-privilege node service account:** only `roles/container.defaultNodeServiceAccount` and `roles/artifactregistry.reader`, instead of the default compute service account.
 - **Workload Identity:** pods authenticate as a Google service account with no exported keys, bound to the exact namespace and Kubernetes service account (`hello/hello-api`).
+- **Explicit image pull policy:** `image.pullPolicy` defaults to `IfNotPresent` and is set explicitly rather than left to Kubernetes, which defaults to `Always` for `:latest` tags and stores that default when the Deployment is first created (so fresh installs and upgrades can behave differently). Pair it with immutable tags such as versions or Git SHAs; `Always` adds a registry call to every pod start, so a registry outage can block scaling and recovery.
 - **Zero-downtime rollouts:** readiness probe, SIGTERM drain in the app, `maxUnavailable: 0`, and a PodDisruptionBudget.
 - **Lab-only settings:** `deletion_protection = false` and a public control-plane endpoint. In production, enable deletion protection and restrict the endpoint with `master_authorized_networks_config` or a private endpoint.
 
@@ -309,16 +310,24 @@ helm history hello-api -n hello
 ## Teardown
 
 ```bash
-scripts/teardown.sh        # asks for confirmation; use --yes to skip the prompt
+kubectl config use-context gke_${PROJECT_ID}_${REGION}_${CLUSTER_NAME}   # Helm acts on the current context
+scripts/teardown.sh                 # asks for confirmation
+scripts/teardown.sh --yes           # no prompt
+scripts/teardown.sh --purge-state   # also delete the Terraform state bucket
 ```
 
-Uninstalls the Helm release, deletes the Cloud Run service, and runs `terraform destroy`, which also removes the Artifact Registry repository and its images. Each step skips cleanly if the resource is already gone. To rebuild for the next session, run `scripts/setup.sh`, then repeat steps 2 to 4. The `import` block adopts the recreated repository again automatically.
+The script:
 
-The Terraform state bucket is deliberately left in place, since it holds the state history. To remove it once you're completely done with the lab:
+1. Uninstalls the Helm release from the current kubectl context.
+2. Deletes the Cloud Run service.
+3. Runs `terraform destroy`, which removes the cluster, network, NAT, service accounts, IAM bindings, and the Artifact Registry repository with its images.
+4. Deletes the Cloud Build source bucket (`<PROJECT_ID>_cloudbuild`), which holds the source tarballs from `gcloud builds submit`. The next build recreates it.
+5. Keeps the Terraform state bucket by default, since it holds the state history. With `--purge-state`, it deletes that bucket too, after `terraform destroy` has finished using it.
+6. Verifies the teardown by listing GKE clusters and Cloud Run services, and exits with an error if any remain.
 
-```bash
-gcloud storage rm --recursive gs://$TF_STATE_BUCKET
-```
+Each step skips cleanly if the resource is already gone. Cloud Build's build history remains, but it's free and can't be deleted.
+
+To rebuild for the next session, run `scripts/setup.sh`, then repeat steps 2 to 4. The `import` block adopts the recreated repository again automatically.
 
 ## Cost
 
